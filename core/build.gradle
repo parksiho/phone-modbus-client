@@ -1,0 +1,17 @@
+// 안드로이드 의존성이 없는 순수 Java 모듈 (네트워크 스택 + Modbus)
+plugins {
+    id 'java-library'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
+}
+
+// PC 에서 가상 장비망 검증: sudo tools/run_tap_test.sh
+tasks.register('tapSelfTest', JavaExec) {
+    group = 'verification'
+    description = 'TAP 가상 장비망에서 스택 검증 (tools/tap_bridge.py, modbus_sim.py 선행 실행 필요)'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.emsfield.test.TapSelfTest'
+}

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Realtek (RTL8152/8153/8156) -->
+    <usb-device vendor-id="3034" />
+    <!-- ASIX (AX88179/AX88772) -->
+    <usb-device vendor-id="2965" />
+    <!-- 표준 CDC 통신 클래스 장치 (ECM/NCM) -->
+    <usb-device class="2" />
+</resources>
