@@ -34,11 +34,21 @@ public final class NetStack implements Closeable {
         public final boolean ok;
         public final double rttMs;
         public final String error;
+        /** 응답 패킷의 TTL (실패 시 0) */
+        public final int ttl;
+        /** ICMP 페이로드 크기 */
+        public final int size;
 
         PingResult(boolean ok, double rttMs, String error) {
+            this(ok, rttMs, error, 0, 0);
+        }
+
+        PingResult(boolean ok, double rttMs, String error, int ttl, int size) {
             this.ok = ok;
             this.rttMs = rttMs;
             this.error = error;
+            this.ttl = ttl;
+            this.size = size;
         }
 
         @Override
@@ -56,6 +66,8 @@ public final class NetStack implements Closeable {
     private static final byte[] ZERO_MAC = new byte[6];
     private static final int MIN_FRAME = 60;
     private static final int ARP_RETRY_MS = 300;
+    /** 단편화 미지원 → 이더넷 MTU 1500 - IP 20 - ICMP 8 */
+    public static final int MAX_PING_PAYLOAD = 1472;
 
     private final FrameIO io;
     private final byte[] mac;
@@ -189,6 +201,12 @@ public final class NetStack implements Closeable {
     }
 
     public PingResult ping(int dst, int timeoutMs) {
+        return ping(dst, timeoutMs, 32);
+    }
+
+    /** @param payloadSize ICMP 데이터 크기 (0 ~ {@link #MAX_PING_PAYLOAD}) */
+    public PingResult ping(int dst, int timeoutMs, int payloadSize) {
+        int size = Math.max(0, Math.min(MAX_PING_PAYLOAD, payloadSize));
         synchronized (pingLock) {
             long deadline = System.currentTimeMillis() + timeoutMs;
             try {
@@ -198,7 +216,7 @@ public final class NetStack implements Closeable {
             }
             int id = 0x4542;
             int seq = (++pingSeq) & 0xFFFF;
-            byte[] p = new byte[8 + 32];
+            byte[] p = new byte[8 + size];
             p[0] = 8;
             put16(p, 4, id);
             put16(p, 6, seq);
@@ -211,7 +229,7 @@ public final class NetStack implements Closeable {
                 sendIpv4(dst, PROTO_ICMP, p, 0, p.length, true, 0);
                 long remain = Math.max(1, deadline - System.currentTimeMillis());
                 if (w.latch.await(remain, TimeUnit.MILLISECONDS)) {
-                    return new PingResult(true, (w.replyNanos - t0) / 1_000_000.0, null);
+                    return new PingResult(true, (w.replyNanos - t0) / 1_000_000.0, null, w.ttl, size);
                 }
                 return new PingResult(false, 0, "응답 없음 (장비가 ICMP 를 막았을 수 있음 - Modbus 포트 확인 권장)");
             } catch (IOException e) {
@@ -333,11 +351,11 @@ public final class NetStack implements Closeable {
         if (dst != config.address) return;
         int po = o + ihl;
         int plen = total - ihl;
-        if (proto == PROTO_ICMP) handleIcmp(src, b, po, plen);
+        if (proto == PROTO_ICMP) handleIcmp(src, b[o + 8] & 0xFF, b, po, plen);
         else if (proto == PROTO_TCP) handleTcp(src, dst, b, po, plen);
     }
 
-    private void handleIcmp(int src, byte[] b, int o, int len) {
+    private void handleIcmp(int src, int ttl, byte[] b, int o, int len) {
         if (len < 8 || checksum(b, o, len, 0) != 0) return;
         int type = b[o] & 0xFF;
         if (type == 8) { // echo request → reply (장비/노트북에서 앱 IP로 ping 가능)
@@ -355,6 +373,7 @@ public final class NetStack implements Closeable {
             PingWaiter w = pingWaiter;
             if (w != null && w.target == src && u16(b, o + 4) == w.id && u16(b, o + 6) == w.seq) {
                 w.replyNanos = System.nanoTime();
+                w.ttl = ttl;
                 w.latch.countDown();
             }
         }
@@ -513,6 +532,7 @@ public final class NetStack implements Closeable {
         final int target, id, seq;
         final CountDownLatch latch = new CountDownLatch(1);
         volatile long replyNanos;
+        volatile int ttl;
 
         PingWaiter(int target, int id, int seq) {
             this.target = target;

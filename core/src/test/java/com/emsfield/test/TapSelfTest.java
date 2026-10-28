@@ -58,6 +58,11 @@ public final class TapSelfTest {
         expectError("대역 밖(10.0.0.5) + 게이트웨이 없음 → 경로 없음", NoRouteToHostException.class,
                 () -> stack.connect(Ip4.parse("10.0.0.5"), 502, 500));
 
+        NetStack.PingResult big = stack.ping(device, 1000, 1000);
+        check("Ping 크기 1000 B + TTL 읽기 (" + big + ", ttl " + big.ttl + ")", big.ok && big.size == 1000 && big.ttl > 0);
+        NetStack.PingResult capped = stack.ping(device, 1000, 5000);
+        check("Ping 크기 상한 1472 B 로 제한", capped.ok && capped.size == NetStack.MAX_PING_PAYLOAD);
+
         section("3. TCP 포트 점검");
         expectError("닫힌 포트 503 → 연결 거부(RST)", ConnectException.class,
                 () -> stack.connect(device, 503, 1000));
@@ -101,6 +106,24 @@ public final class TapSelfTest {
         System.out.println("  " + ex.exceptionText());
         check("범위 밖 주소 → 예외 02 해석", ex.exceptionCode == 2);
         check("FC03 최대 125개 읽기", mb.readHoldingRegisters(1, 0, 125).registers.length == 125);
+
+        int[] fw = RegisterDecoder.encode(230.4, DataType.FLOAT32, ByteOrder.CDAB);
+        check("FLOAT32 CDAB 인코딩→FC16 쓰기→읽기 해석 = 230.4", mb.writeMultipleRegisters(1, 110, fw).ok()
+                && near(RegisterDecoder.decode(mb.readHoldingRegisters(1, 110, 2).registers, 0, DataType.FLOAT32, ByteOrder.CDAB), 230.4));
+        boolean roundTrip = true;
+        double[] samples = {-1, 0, 1234, 65535, -32768};
+        DataType[] types = {DataType.INT16, DataType.UINT16, DataType.INT32, DataType.UINT32, DataType.FLOAT32};
+        for (DataType t : types) for (ByteOrder o : ByteOrder.values()) for (double s0 : samples) {
+            if ((t == DataType.UINT16 || t == DataType.UINT32) && s0 < 0) continue;
+            if (t == DataType.INT16 && s0 > 32767) continue;
+            if (RegisterDecoder.decode(RegisterDecoder.encode(s0, t, o), 0, t, o) != s0) roundTrip = false;
+        }
+        check("encode/decode 왕복 (5 타입 × 4 순서)", roundTrip);
+        int[] badc = RegisterDecoder.encode(0x1234, DataType.UINT16, ByteOrder.BADC);
+        check("UINT16 BADC 인코딩 0x1234 → 0x3412", badc[0] == 0x3412);
+        TcpConnection probe = stack.connect(device, 502, 1500);
+        probe.reset();
+        check("TCP 연결 후 즉시 RST (TCP ping)", !probe.isOpen());
 
         section("5. 연속 폴링 (현장 안정성)");
         int n = 300, good = 0;

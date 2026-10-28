@@ -38,6 +38,30 @@ public final class RegisterDecoder {
         }
     }
 
+    /**
+     * 값을 레지스터 워드로 변환 (쓰기용). decode 의 역함수.
+     * 정수형은 범위를 벗어나면 하위 비트만 남는다(장비 쓰기 전 미리보기로 확인).
+     */
+    public static int[] encode(double value, DataType type, ByteOrder order) {
+        long bits;
+        switch (type) {
+            case INT16:
+            case UINT16: bits = ((long) value) & 0xFFFFL; break;
+            case INT32:
+            case UINT32: bits = ((long) value) & 0xFFFFFFFFL; break;
+            case FLOAT32: bits = Float.floatToIntBits((float) value) & 0xFFFFFFFFL; break;
+            case FLOAT64: bits = Double.doubleToLongBits(value); break;
+            default: throw new IllegalStateException();
+        }
+        int n = type.registers;
+        int[] be = new int[n]; // 빅엔디안(ABCD) 워드
+        for (int i = 0; i < n; i++) be[i] = (int) ((bits >>> ((n - 1 - i) * 16)) & 0xFFFF);
+        byte[] raw = toBytes(be, 0, n, order); // 순서 변환은 자기 역함수
+        int[] out = new int[n];
+        for (int i = 0; i < n; i++) out[i] = ((raw[i * 2] & 0xFF) << 8) | (raw[i * 2 + 1] & 0xFF);
+        return out;
+    }
+
     /** 레지스터들을 지정 순서를 적용한 빅엔디안 바이트열로 변환 */
     static byte[] toBytes(int[] regs, int index, int count, ByteOrder order) {
         byte[] b = new byte[count * 2];

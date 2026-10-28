@@ -106,6 +106,11 @@ public final class TcpConnection implements ByteTransport {
         }
     }
 
+    /** RST 를 보내고 즉시 닫는다 (TCP ping 처럼 연결 확인만 할 때). */
+    public void reset() {
+        abort(null);
+    }
+
     /** RST 를 보내고 즉시 닫는다. */
     void abort(String reason) {
         synchronized (this) {

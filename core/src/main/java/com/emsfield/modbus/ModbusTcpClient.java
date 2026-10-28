@@ -22,7 +22,15 @@ public final class ModbusTcpClient implements Closeable {
     public static final int FC_WRITE_MULTIPLE_COILS = 0x0F;
     public static final int FC_WRITE_MULTIPLE_REGISTERS = 0x10;
 
+    /** 원시 프레임 관찰 (로그용). 예외·타임아웃이 나도 송신 프레임은 먼저 전달된다. */
+    public interface FrameListener {
+        void onTx(byte[] adu);
+
+        void onRx(byte[] adu);
+    }
+
     private final ByteTransport transport;
+    private FrameListener frameListener;
     private int timeoutMs = 1000;
     private int transactionId;
 
@@ -32,6 +40,14 @@ public final class ModbusTcpClient implements Closeable {
 
     public void setTimeoutMs(int timeoutMs) {
         this.timeoutMs = timeoutMs;
+    }
+
+    public int timeoutMs() {
+        return timeoutMs;
+    }
+
+    public void setFrameListener(FrameListener l) {
+        this.frameListener = l;
     }
 
     // ------------------------------------------------------------------ 읽기
@@ -130,6 +146,7 @@ public final class ModbusTcpClient implements Closeable {
 
         long t0 = System.nanoTime();
         long deadline = System.currentTimeMillis() + timeoutMs;
+        if (frameListener != null) frameListener.onTx(req);
         transport.write(req, 0, req.length);
 
         byte[] resp;
@@ -148,6 +165,7 @@ public final class ModbusTcpClient implements Closeable {
             resp = new byte[7 + body.length];
             System.arraycopy(mbap, 0, resp, 0, 7);
             System.arraycopy(body, 0, resp, 7, body.length);
+            if (frameListener != null) frameListener.onRx(resp);
             break;
         }
         double rtt = (System.nanoTime() - t0) / 1_000_000.0;
