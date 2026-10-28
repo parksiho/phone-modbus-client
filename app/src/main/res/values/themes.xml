@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Nocturne 다크 테마: 시작 화면부터 배경이 --color-bg (#161826) -->
+    <!-- Nocturne 다크 테마: 시작 화면부터 배경이 color-bg (#161826) -->
     <style name="AppTheme" parent="@android:style/Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/bg</item>
         <item name="android:colorBackground">@color/bg</item>

@@ -19,6 +19,7 @@ import android.os.Looper;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowInsets;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -1154,11 +1155,30 @@ public class MainActivity extends Activity {
         root.addView(toastView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         root.addView(drawerView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         root.addView(sheetView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        padBelowStatusBar(root);
         setContentView(root);
         render();
         renderToast();
         renderDrawer();
         renderSheet();
+    }
+
+    /** targetSdk 35 는 화면이 상태바 아래로 깔리므로, 시계 영역 높이만큼 내용을 내린다. */
+    private static void padBelowStatusBar(View root) {
+        root.setOnApplyWindowInsetsListener((v, insets) -> {
+            int top = statusBarTop(insets);
+            if (v.getPaddingTop() != top) v.setPadding(0, top, 0, v.getPaddingBottom());
+            return insets;
+        });
+    }
+
+    private static int statusBarTop(WindowInsets insets) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            android.graphics.Insets bars = insets.getInsets(
+                    WindowInsets.Type.statusBars() | WindowInsets.Type.displayCutout());
+            return bars.top;
+        }
+        return insets.getSystemWindowInsetTop();
     }
 
     private ScrollView scroll(View content, int topPadDp) {
