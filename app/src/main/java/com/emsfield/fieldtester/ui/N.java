@@ -1,5 +1,6 @@
 package com.emsfield.fieldtester.ui;
 
+import android.app.Activity;
 import android.content.Context;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
@@ -8,12 +9,16 @@ import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.LayerDrawable;
 import android.graphics.drawable.StateListDrawable;
+import android.os.Build;
 import android.text.InputType;
 import android.text.TextUtils;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -322,9 +327,58 @@ public final class N {
         e.setIncludeFontPadding(false);
         e.setInputType(numeric ? InputType.TYPE_CLASS_NUMBER
                 : InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-        if (android.os.Build.VERSION.SDK_INT >= 29) e.setTextCursorDrawable(cursor()); // caret-color: accent
+        e.setFocusable(true);
+        e.setFocusableInTouchMode(true);
+        e.setShowSoftInputOnFocus(true);
+        e.setCursorVisible(true);
+        if (Build.VERSION.SDK_INT >= 26) e.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
+        if (Build.VERSION.SDK_INT >= 29) e.setTextCursorDrawable(cursor()); // caret-color: accent
         e.setHighlightColor(alpha(ACCENT, 0.30f));
+        e.setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus) showKeyboard(v);
+            else v.post(() -> {
+                View focus = v.getRootView().findFocus();
+                if (!(focus instanceof EditText)) hideKeyboard(v);
+            });
+        });
+        e.setOnClickListener(v -> showKeyboard(v));
+        e.setOnTouchListener((v, ev) -> {
+            if (ev.getAction() == MotionEvent.ACTION_UP) v.post(() -> showKeyboard(v));
+            return false;
+        });
         return e;
+    }
+
+    /**
+     * 소프트 키보드를 연다.
+     * 사용자가 한 번 내리면 같은 칸은 포커스가 유지되고, 암시적 표시 요청은 무시된다.
+     * 누를 때마다 명시적으로 다시 연다.
+     */
+    @SuppressWarnings("deprecation")
+    public static void showKeyboard(View v) {
+        Context ctx = v.getContext();
+        if (!v.isFocused()) v.requestFocusFromTouch();
+        if (ctx instanceof Activity) {
+            ((Activity) ctx).getWindow().setSoftInputMode(
+                    WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN
+                            | WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
+        }
+        InputMethodManager imm = (InputMethodManager) ctx.getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (imm == null) return;
+        v.post(() -> {
+            if (!v.isFocused()) return;
+            imm.restartInput(v);
+            imm.showSoftInput(v, InputMethodManager.SHOW_FORCED);
+        });
+    }
+
+    public static void hideKeyboard(View v) {
+        Context ctx = v.getContext();
+        if (ctx instanceof Activity) {
+            ((Activity) ctx).getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN);
+        }
+        InputMethodManager imm = (InputMethodManager) ctx.getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (imm != null) imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
     }
 
     private static Drawable cursor() {

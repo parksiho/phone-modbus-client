@@ -79,7 +79,6 @@ final class PingScreen {
         check.setOnClickListener(v -> cb.toggle());
         cb.setOnCheckedChangeListener((v, on) -> {
             a.pingUsePort = on;
-            if (on && a.pingPort.isEmpty()) a.pingPort = a.devPort;
             a.render();
         });
         EditText portIn = N.input(c, a.pingPort, true);
@@ -149,14 +148,14 @@ final class PingScreen {
         String src = a.ipState == IpSt.OK ? a.ip.trim() : "0.0.0.0";
         String tgt = a.pingTarget.trim();
         if (a.adapter != Ad.UP) route.setText(t("adNone"));
-        else if (a.pingUsePort) route.setText("TCP · USB " + src + " → " + tgt + ":" + a.pingPort.trim());
+        else if (a.pingTcp()) route.setText("TCP · USB " + src + " → " + tgt + ":" + a.pingPort.trim());
         else route.setText("ICMP · USB " + src + " → " + tgt + " · " + MainActivity.parseIntOr(a.pingSize, 56) + " B");
     }
 
     void refresh() {
         if (route == null) return;
-        sizeIn.setEnabled(!a.pingUsePort);
-        sizeIn.setAlpha(a.pingUsePort ? 0.45f : 1f);
+        sizeIn.setEnabled(!a.pingTcp());
+        sizeIn.setAlpha(a.pingTcp() ? 0.45f : 1f);
         portField.setVisibility(a.pingUsePort ? View.VISIBLE : View.INVISIBLE);
         refreshRoute();
         startBtn.setText(a.pingRunning ? t("pStop") : t("pStart"));

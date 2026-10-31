@@ -81,8 +81,12 @@ final class MainScreen {
         LinearLayout col = new LinearLayout(c);
         col.setOrientation(LinearLayout.VERTICAL);
         section(col, "adapter", "secAdapter", buildAdapter(), false);
-        section(col, "ip", "secIp", buildIp(), true);
-        section(col, "target", "secTarget", buildTarget(), true);
+        col.addView(N.fadeRule(c, N.DIVIDER));
+        LinearLayout pair = N.row(c, 8);
+        pair.setGravity(Gravity.TOP);
+        pair.addView(cardSection("ip", "secIp", buildIp(), true), half());
+        pair.addView(cardSection("target", "secTarget", buildTarget(), true), half());
+        col.addView(pair);
         section(col, "req", "secReq", buildReq(), true);
         section(col, "res", "secRes", buildRes(), true);
         section(col, "log", "secLog", buildLog(), true);
@@ -90,9 +94,27 @@ final class MainScreen {
         return col;
     }
 
-    // ------------------------------------------------------------------ section frame
+    private static LinearLayout.LayoutParams half() {
+        return new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
+    }
+
+    private View cardSection(String key, String titleKey, View body, boolean tnum) {
+        LinearLayout card = N.card(c);
+        card.setClipChildren(false);
+        card.addView(sectionBody(key, titleKey, body, tnum));
+        return card;
+    }
+
     private void section(LinearLayout col, String key, String titleKey, View body, boolean tnum) {
         if (!key.equals("adapter")) col.addView(N.fadeRule(c, N.DIVIDER));
+        col.addView(sectionBody(key, titleKey, body, tnum));
+    }
+
+    // ------------------------------------------------------------------ section frame
+    private LinearLayout sectionBody(String key, String titleKey, View body, boolean tnum) {
+        LinearLayout box = new LinearLayout(c);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setClipChildren(false);
         LinearLayout head = N.row(c, 8);
         head.setClipChildren(false); // 상태 점 글로우가 잘리지 않게
         head.setPadding(0, N.dp(10), 0, N.dp(8));
@@ -111,13 +133,14 @@ final class MainScreen {
         head.addView(sum, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         TextView caret = N.icon(c, N.I_CARET_DOWN, 14, N.NEUTRAL_600);
         head.addView(caret);
-        col.addView(head);
+        box.addView(head);
         body.setPadding(0, 0, 0, key.equals("log") ? 0 : N.dp(12));
-        col.addView(body);
+        box.addView(body);
         dots.put(key, dot);
         sums.put(key, sum);
         carets.put(key, caret);
         bodies.put(key, body);
+        return box;
     }
 
     private EditText bound(EditText e, MainActivity.Watch.On on) {

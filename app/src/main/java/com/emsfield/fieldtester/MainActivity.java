@@ -2,6 +2,7 @@ package com.emsfield.fieldtester;
 
 import android.app.Activity;
 import android.app.PendingIntent;
+import android.content.res.Configuration;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -215,6 +216,7 @@ public class MainActivity extends Activity {
         N.init(this);
         getWindow().setStatusBarColor(N.BG);
         getWindow().setNavigationBarColor(N.BG);
+        allowSoftKeyboardWithHardwareKeyboard();
         usb = (UsbManager) getSystemService(Context.USB_SERVICE);
         cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
         prefs = getSharedPreferences("fieldtester", MODE_PRIVATE);
@@ -232,6 +234,21 @@ public class MainActivity extends Activity {
         cm.registerDefaultNetworkCallback(netCallback);
 
         if (UsbManager.ACTION_USB_DEVICE_ATTACHED.equals(getIntent().getAction())) usbInfo();
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        allowSoftKeyboardWithHardwareKeyboard();
+    }
+
+    /** USB 이더넷 어댑터가 키보드로 잡혀도 화면 키보드를 숨기지 않게 한다. */
+    private void allowSoftKeyboardWithHardwareKeyboard() {
+        try {
+            android.provider.Settings.Secure.putInt(getContentResolver(), "show_ime_with_hard_keyboard", 1);
+        } catch (SecurityException ignored) {
+            // WRITE_SECURE_SETTINGS 는 adb 로 부여된 디버그 설치에서만 성공한다.
+        }
     }
 
     @Override
@@ -580,15 +597,25 @@ public class MainActivity extends Activity {
             return;
         }
         int target;
-        int port;
         try {
             target = Ip4.parse(devIp);
-            port = Integer.parseInt(devPort.trim());
         } catch (RuntimeException e) {
             checks.put(k, new Check("invalid", null, true, false));
             render();
             return;
         }
+        int parsedPort = 0;
+        if ("port".equals(k)) {
+            try {
+                parsedPort = Integer.parseInt(devPort.trim());
+                if (parsedPort < 1 || parsedPort > 65535) throw new NumberFormatException();
+            } catch (RuntimeException e) {
+                checks.put(k, new Check("invalid", null, true, false));
+                render();
+                return;
+            }
+        }
+        final int port = parsedPort;
         checks.put(k, new Check("…", null, false, true));
         render();
         String dev = devIp.trim();
@@ -1013,6 +1040,11 @@ public class MainActivity extends Activity {
         return String.valueOf((long) v);
     }
 
+    /** 포트 칸이 비어 있으면 ICMP. 포트가 있을 때만 TCP 핑. */
+    boolean pingTcp() {
+        return pingUsePort && pingPort != null && !pingPort.trim().isEmpty();
+    }
+
     // ================================================================== Ping screen
     void pingStart() {
         if (adapter != Ad.UP) {
@@ -1028,8 +1060,19 @@ public class MainActivity extends Activity {
             return;
         }
         final int size = Math.max(0, Math.min(NetStack.MAX_PING_PAYLOAD, parseIntOr(pingSize, 56)));
-        final boolean tcpMode = pingUsePort;
-        final int port = parseIntOr(pingPort, 502);
+        final String portText = pingPort == null ? "" : pingPort.trim();
+        final boolean tcpMode = pingUsePort && !portText.isEmpty();
+        final int port;
+        if (tcpMode) {
+            port = parseIntOr(portText, -1);
+            if (port < 1 || port > 65535) {
+                addLog("ERR", "잘못된 포트: " + portText, "Invalid port: " + portText);
+                render();
+                return;
+            }
+        } else {
+            port = 0;
+        }
         final int max = pingCount, iv = pingIv;
         final int gen = ++pingGen;
         pingRes.clear();
