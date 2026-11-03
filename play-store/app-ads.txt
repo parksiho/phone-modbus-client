@@ -1,0 +1,6 @@
+# Replace pub-0000000000000000 with the AdMob publisher ID
+# (AdMob → 설정 → 계정 정보). Host this file at:
+#   https://<the domain registered in Play Console>/app-ads.txt
+# The developer domain in Play Console must serve this URL over HTTPS.
+
+google.com, pub-0000000000000000, DIRECT, f08c47fec0942fa0

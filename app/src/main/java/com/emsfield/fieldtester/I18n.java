@@ -14,6 +14,7 @@ final class I18n {
     }
 
     static {
+        p("appName", "모드버스 체커", "Modbus Checker");
         p("title", "Modbus 클라이언트", "Modbus Client");
         p("secAdapter", "USB 어댑터", "USB adapter");
         p("usbInfo", "USB 정보", "USB info");

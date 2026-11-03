@@ -22,6 +22,10 @@ import java.security.SecureRandom;
  * 이 순간부터 안드로이드 OS 는 이 어댑터를 네트워크로 인식하지 않으므로,
  * 폰의 LTE/Wi-Fi 라우팅에는 아무 영향이 없다.
  * <p>
+ * {@code send}/{@code receive} 는 {@link UsbDeviceConnection#bulkTransfer} 만 호출한다.
+ * 광고를 LTE/Wi-Fi 로 고정하는 {@code ConnectivityManager.bindProcessToNetwork} 는
+ * 이 프로세스의 java.net 소켓만 묶으므로, 여기 장비망 프레임 경로는 바뀌지 않는다.
+ * <p>
  * 많은 Realtek RTL8153 어댑터는 구성 #1(제조사 전용) 외에 CDC-ECM 구성을 함께 제공한다.
  * 현재 구성이 ECM 이 아니면 ECM 구성으로 전환을 시도한다.
  */

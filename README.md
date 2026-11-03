@@ -1,4 +1,6 @@
-# phone-modbus-client
+# 모드버스 체커 (Modbus Checker)
+
+저장소 이름은 `phone-modbus-client`, 패키지 이름은 `com.emsfield.fieldtester` 이다.
 
 안드로이드 폰에 USB-C 이더넷 어댑터를 꽂아 현장 계측기(전력량계, PLC, 게이트웨이)와 **Modbus TCP 통신을 점검하는 앱**의 PoC.
 
@@ -16,12 +18,14 @@
 폰 OS 네트워크 (LTE / Wi-Fi) ───────────────────────────→ 인터넷 (영향 없음)
 ```
 
+배너 광고의 HTTP 도 이 LTE/Wi-Fi 경로만 쓴다. USB 장비망으로는 나가지 않는다. 규칙은 아래 광고 섹션.
+
 ## 구조
 
 | 모듈 | 내용 |
 |---|---|
 | `core/` | 순수 Java (안드로이드 의존성 없음). `NetStack`, `TcpConnection`, `ModbusTcpClient`, `RegisterDecoder` |
-| `app/` | 안드로이드 앱. `UsbCdcEcmFrameIO`(USB 드라이버), `UsbAdapterInfo`(칩셋 식별), `MainActivity`(PoC 화면) |
+| `app/` | 안드로이드 앱. `UsbCdcEcmFrameIO`(USB 드라이버), `UsbAdapterInfo`(칩셋 식별), `MainActivity`(PoC 화면), `BannerSlot`(AdMob 배너, LTE/Wi-Fi 전용) |
 | `tools/` | PC 검증 도구: TAP 브리지, 가상 전력량계, ICMP ping, 통합 테스트 스크립트 |
 
 `FrameIO` 인터페이스 아래(USB 드라이버)만 바꾸면 위의 스택·Modbus 로직은 그대로 재사용된다.
@@ -83,7 +87,57 @@ USB 드라이버 코드(`UsbCdcEcmFrameIO`)도 가짜 RTL8153(구성#1 제조사
 ## 안드로이드 빌드
 
 Android Studio 에서 이 폴더를 열고 `app` 을 실행한다. (AGP 8.7, compileSdk 35, minSdk 26, Java 11)
-외부 라이브러리 의존성은 없다.
+
+`core` 는 외부 라이브러리가 없다. `app` 만 AdMob `play-services-ads` 25.5.0 을 쓴다 (UMP 동의 SDK 포함).
+
+```bash
+./gradlew assembleDebug
+./gradlew bundleRelease
+```
+
+`bundleRelease` 는 R8 이 켜진 스토어용 AAB 입니다. 업로드 키가 없으면 서명하지 않고 끝납니다. 키 만드는 법과 Play 체크리스트는 `keystore.properties.example`, `tools/gen_upload_keystore.sh`, `play-store/release-checklist.md` 에 있습니다.
+
+## 광고 (AdMob 배너)
+
+메인 화면 하단에 **고정 적응형 배너 하나**만 둔다. 전면, 앱 오픈, 보상형 광고는 없다.
+광고가 없거나 로드에 실패해도 Modbus / Ping / USB 는 그대로 동작한다.
+
+테스트 ID 는 `app/src/main/res/values/ads.xml` 에만 있다. 매니페스트 `APPLICATION_ID` 는 `admob_application_id` 를 참조한다.
+
+| 키 | 현재 값 (Google 테스트) |
+|---|---|
+| `admob_application_id` | `ca-app-pub-3940256099942544~3347511713` |
+| `admob_banner_unit_id` | `ca-app-pub-3940256099942544/9214589741` (적응형 배너) |
+
+순서는 UMP 동의(`requestConsentInfoUpdate` → `loadAndShowConsentFormIfRequired`) → `MobileAds.initialize` → 배너 로드다.
+SDK 25.5 의 `MobileAdsInitProvider` 는 앱 ID 형식만 검사하고 소켓을 열지 않는다. 초기화는 네트워크 규칙을 통과한 뒤에만 호출한다.
+EEA 밖에서는 AdMob 에 개인정보 메시지를 게시하기 전까지 동의 창이 없는 것이 정상이다. 동의가 필요 없으면 바로 배너를 요청한다.
+
+### 네트워크 규칙
+
+광고, UMP, SDK 초기화의 HTTP 는 **LTE/셀룰러 또는 Wi-Fi** 로만 나간다.
+
+1. 로드 전에 `ConnectivityManager` 로 기본 네트워크를 본다. `TRANSPORT_CELLULAR` 또는 `TRANSPORT_WIFI` 이고 `NET_CAPABILITY_INTERNET` + `NET_CAPABILITY_VALIDATED` 일 때만 진행한다.
+2. 기본 네트워크가 `TRANSPORT_ETHERNET` 이면 (OS 가 어댑터를 먼저 잡은 경우) 셀룰러/Wi-Fi 를 `requestNetwork` 로 요청한다. 그 네트워크가 같은 조건을 만족할 때만 `bindProcessToNetwork` 로 프로세스 소켓을 묶고, 그 다음에 UMP·초기화·로드를 한다.
+3. 조건에 맞는 네트워크가 없으면 배너를 `GONE` 으로 숨기고 요청하지 않는다. 기본 네트워크와 셀룰러/Wi-Fi 의 변화는 `NetworkCallback` 으로 다시 판단한다.
+4. 적합한 네트워크를 잃으면 **배너를 먼저 파괴한 다음** 바인딩을 풀어, 갱신 요청이 이더넷으로 새지 않게 한다.
+
+`bindProcessToNetwork` 는 이 프로세스의 **java.net 소켓**만 묶는다. 장비 통신은 `UsbCdcEcmFrameIO.send` / `receive` 가 `UsbDeviceConnection.bulkTransfer` 로 이더넷 프레임을 보내고, `NetStack` / `TcpConnection` 이 그 프레임 위에서 TCP 를 만든다. OS 소켓을 쓰지 않으므로 바인딩과 무관하다. `SocketTransport` 는 OS 소켓 비교용이며 앱 경로에서 쓰지 않는다.
+
+폴링, Modbus 쓰기(FC05/06/15/16), Ping 테스트가 도는 동안에는 `AdView.pause()`, 끝나면 `resume()` 한다. Activity `onResume` / `onPause` / `onDestroy` 에도 연결한다. 배너는 메인 화면에만 보이고, Ping 화면에서는 숨긴 채 멈춘다.
+
+API 31 미만을 포함해, 프로세스를 LTE/Wi-Fi 에 묶으면 기본 네트워크 콜백이 그 네트워크를 가리킨다. 폰 인터넷 줄의 "OS 가 어댑터 사용 중" 은 이더넷 트랜스포트를 따로 감시해서, 광고 바인딩 후에도 OS 가 어댑터를 잡고 있으면 경고가 남는다.
+
+### 실제 ID로 바꾸기
+
+1. [AdMob](https://admob.google.com/) 에서 앱을 등록하고 **앱 ID** 와 **배너 광고 단위 ID** 를 만든다.
+2. `app/src/main/res/values/ads.xml` 의 두 문자열을 그 값으로 바꾼다.
+3. Play Console **정책 → 앱 콘텐츠 → 광고** 에서 광고 포함으로 선언한다.
+4. **데이터 보안** 양식에 광고 ID 등 AdMob 이 수집·공유하는 항목을 적고, 개인정보처리방침 URL 을 스토어 등록정보와 앱에 연결한다.
+5. Play Console 에 등록한 개발자 도메인 루트에 `app-ads.txt` 를 둔다. AdMob 앱 설정의 한 줄(`google.com, pub-xxxxxxxx, DIRECT, f08c47fec0942fa0`)을 넣는다.
+6. 테스트 ID 로 스토어 빌드를 올리지 않는다. 개발 중에는 테스트 ID 를 유지해 무효 트래픽으로 계정이 제한되지 않게 한다. 등록정보, 데이터 보안, 개인정보처리방침, `app-ads.txt` 초안은 `play-store/` 에 있다.
+
+실기기에서 볼 것: Wi-Fi 또는 LTE 에서만 테스트 배너가 보이는지, 비행기 모드이거나 이더넷뿐이면 배너가 사라지는지, OS 가 어댑터를 잡은 상태에서도 Modbus/Ping 이 계속되는지, 폴링·쓰기·Ping 중에 배너 갱신이 멈추는지.
 
 ## 실기기 PoC 체크리스트
 
@@ -99,6 +153,7 @@ Android Studio 에서 이 폴더를 열고 `app` 을 실행한다. (AGP 8.7, com
 | 6 | Modbus 읽기 | FC03, 장비 매뉴얼의 레지스터 주소/타입/순서로 **[실행]** | 값이 매뉴얼과 일치 |
 | 7 | 안정성 | **[폴링 시작]** 10분 | 실패 0, 응답시간 기록 |
 | 8 | 재연결 | 케이블 뽑았다 꽂기 → 다시 **[어댑터 연결]** | 정상 복귀 |
+| 9 | 배너 | Wi-Fi 또는 LTE 에서만 테스트 배너. 비행기 모드·이더넷뿐이면 배너 없음. 폴링/쓰기/Ping 중에는 갱신 정지 | 광고 실패·오프라인이어도 1–8 은 그대로 |
 
 결과(특히 1번 USB 정보 전체 로그)를 공유하면 다음 단계(전용 드라이버 여부)를 결정한다.
 

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+      adb 로만 부여되는 서명 권한. Play 가 서명한 릴리스에는 절대 주어지지 않으므로
+      스토어 매니페스트에는 넣지 않는다. 없으면 화면 키보드 유지 설정만 조용히 실패한다.
+    -->
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
+</manifest>
