@@ -3,7 +3,7 @@
 Play Console 의 기본 언어와 영어 번역에 붙여 넣는다. 글자 수는 공백을 포함한다.
 런처 이름은 `app/src/main/res/values/strings.xml` (한국어) 와 `values-en/strings.xml` (영어) 이다.
 
-아직 없는 것: 512×512 아이콘, 1024×500 그래픽 이미지, 휴대폰 스크린샷. 체크리스트를 본다.
+스토어 아이콘과 그래픽 이미지는 `play-store/graphics/` 에 있다. 아직 없는 것은 휴대폰 스크린샷이다.
 
 ## 한국어
 
