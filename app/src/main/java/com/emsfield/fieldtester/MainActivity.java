@@ -1465,7 +1465,7 @@ public class MainActivity extends Activity {
 
         LinearLayout head = N.col(this, 2);
         head.setPadding(N.dp(12), 0, N.dp(12), N.dp(14));
-        head.addView(N.mediumText(this, "Modbus Tool", 17, N.TEXT));
+        head.addView(N.mediumText(this, t("appName"), 17, N.TEXT));
         String sub = adapter == Ad.UP ? "USB · " + (ipState == IpSt.OK ? ip.trim() + "/" + prefix.trim() : t("ipNotSet")) : t("adNone");
         head.addView(N.monoText(this, sub, 11, N.NEUTRAL_500));
         panel.addView(head);

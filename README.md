@@ -1,4 +1,6 @@
-# phone-modbus-client
+# 모드버스 체커 (Modbus Checker)
+
+저장소 이름은 `phone-modbus-client`, 패키지 이름은 `com.emsfield.fieldtester` 이다.
 
 안드로이드 폰에 USB-C 이더넷 어댑터를 꽂아 현장 계측기(전력량계, PLC, 게이트웨이)와 **Modbus TCP 통신을 점검하는 앱**의 PoC.
 

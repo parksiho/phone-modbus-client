@@ -12,7 +12,7 @@
 
 ## 한국어
 
-현장 Modbus 테스터("앱")는 USB-C 이더넷 어댑터로 현장 계측기의 Modbus TCP 를 점검하는 도구입니다. 개발자는 이용자 계정을 만들지 않으며, 장비 데이터나 Modbus 값을 받는 서버를 운영하지 않습니다.
+모드버스 체커("앱", 영문 Modbus Checker)는 USB-C 이더넷 어댑터로 현장 계측기의 Modbus TCP 를 점검하는 도구입니다. 개발자는 이용자 계정을 만들지 않으며, 장비 데이터나 Modbus 값을 받는 서버를 운영하지 않습니다.
 
 ### 기기 안에만 있는 데이터
 
@@ -63,7 +63,7 @@ privacy@example.com
 
 ## English
 
-Field Modbus Tester (the "app") checks Modbus TCP on field instruments through a USB-C Ethernet adapter. The developer does not create user accounts and does not operate a server that receives equipment data or Modbus values.
+Modbus Checker (the "app"; Korean name 모드버스 체커) checks Modbus TCP on field instruments through a USB-C Ethernet adapter. The developer does not create user accounts and does not operate a server that receives equipment data or Modbus values.
 
 ### Data that stays on the device
 

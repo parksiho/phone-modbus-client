@@ -137,14 +137,14 @@ def feature_graphic() -> Image.Image:
     icon = render_icon(560)
     img.alpha_composite(icon, (96, (h - 560) // 2))
 
-    med = ImageFont.truetype(str(FONT_MED), 92)
+    med = ImageFont.truetype(str(FONT_MED), 120)
     reg = ImageFont.truetype(str(FONT_REG), 36)
-    ko_font = ImageFont.truetype(str(FONT_KO), 44) if FONT_KO.is_file() else reg
+    ko_font = ImageFont.truetype(str(FONT_KO), 52) if FONT_KO.is_file() else reg
     x = 760
-    draw.text((x, 300), "USB-C   ·   MODBUS TCP", font=reg, fill=ARC)
-    draw.text((x, 370), "Field Modbus Tester", font=med, fill=TITLE)
-    draw.text((x, 500), "현장 Modbus 테스터", font=ko_font, fill=MUTED)
-    draw.text((x, 590), "Equipment link, off the phone network.", font=reg, fill=MUTED)
+    draw.text((x, 280), "USB-C   ·   MODBUS TCP", font=reg, fill=ARC)
+    draw.text((x, 340), "Modbus Checker", font=med, fill=TITLE)
+    draw.text((x, 490), "모드버스 체커", font=ko_font, fill=MUTED)
+    draw.text((x, 580), "Equipment link, off the phone network.", font=reg, fill=MUTED)
     return opaque(img).resize((1024, 500), Image.Resampling.LANCZOS)
 
 

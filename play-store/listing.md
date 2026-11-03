@@ -1,15 +1,15 @@
 # 스토어 등록정보
 
 Play Console 의 기본 언어와 영어 번역에 붙여 넣는다. 글자 수는 공백을 포함한다.
-런처 이름은 `app/src/main/res/values/strings.xml` (한국어) 와 `values-en/strings.xml` (영어) 이다.
+런처 이름은 짧게 둔다. 한국어 `모드버스 체커`, 영어 `Modbus Checker` (`values/strings.xml`, `values-en/strings.xml`). 패키지 이름은 `com.emsfield.fieldtester` 그대로다. 아래 앱 이름은 Play Console 제목(30자)이다.
 
 스토어 아이콘과 그래픽 이미지는 `play-store/graphics/` 에 있다. 아직 없는 것은 휴대폰 스크린샷이다.
 
 ## 한국어
 
-### 앱 이름 (13 / 30)
+### 앱 이름 (24 / 30)
 
-현장 Modbus 테스터
+모드버스 체커 - USB 이더넷 계측기 점검
 
 ### 간단한 설명 (53 / 80)
 
@@ -17,7 +17,7 @@ USB-C 이더넷으로 계측기 Modbus TCP를 점검합니다. 장비망은 폰 
 
 ### 자세한 설명
 
-현장 Modbus 테스터는 안드로이드 폰과 USB-C 이더넷 어댑터로 전력량계, PLC, 게이트웨이 같은 현장 계측기의 Modbus TCP를 점검하는 도구입니다.
+모드버스 체커는 안드로이드 폰과 USB-C 이더넷 어댑터로 전력량계, PLC, 게이트웨이 같은 현장 계측기의 Modbus TCP를 점검하는 도구입니다.
 
 폰의 LTE·Wi-Fi와 장비망을 섞지 않습니다. 앱이 USB 어댑터를 직접 점유하고, 앱 안에만 있는 IP로 ARP, IPv4, ICMP, TCP를 처리합니다. 그 주소는 안드로이드 네트워크 설정에 등록되지 않습니다.
 
@@ -40,9 +40,9 @@ USB-C 이더넷으로 계측기 Modbus TCP를 점검합니다. 장비망은 폰 
 
 ## English
 
-### App name (19 / 30)
+### App name (29 / 30)
 
-Field Modbus Tester
+Modbus Checker - USB Ethernet
 
 ### Short description (80 / 80)
 
@@ -50,7 +50,7 @@ Test Modbus TCP on field instruments over USB-C Ethernet, off the phone network.
 
 ### Full description
 
-Field Modbus Tester checks Modbus TCP on field instruments such as power meters, PLCs, and gateways, using an Android phone and a USB-C Ethernet adapter.
+Modbus Checker checks Modbus TCP on field instruments such as power meters, PLCs, and gateways, using an Android phone and a USB-C Ethernet adapter.
 
 The phone's LTE or Wi-Fi stays separate from the equipment network. The app claims the USB adapter itself and runs ARP, IPv4, ICMP, and TCP on an IP that exists only inside the app. That address is not registered as an Android network.
 
