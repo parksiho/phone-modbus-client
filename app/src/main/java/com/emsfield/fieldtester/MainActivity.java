@@ -13,6 +13,7 @@ import android.hardware.usb.UsbManager;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
+import android.net.NetworkRequest;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -198,6 +199,12 @@ public class MainActivity extends Activity {
     private TextView titleView, subView;
     private MainScreen mainScreen;
     private PingScreen pingScreen;
+    private BannerSlot bannerSlot;
+    private int writeInFlight;
+    private int navInset;
+    /** OS 가 잡은 이더넷. 광고용 bindProcessToNetwork 와 무관하게 "어댑터를 OS 가 사용 중"을 유지한다. */
+    private final Map<Network, String> osEthernet = new HashMap<>();
+    private boolean ethernetWatchOn;
     private FrameLayout toastView, drawerView, sheetView;
     private final Runnable hideToast = () -> {
         toastKey = null;
@@ -231,9 +238,17 @@ public class MainActivity extends Activity {
         f.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(usbReceiver, f, Context.RECEIVER_NOT_EXPORTED);
         else registerReceiver(usbReceiver, f);
-        cm.registerDefaultNetworkCallback(netCallback);
+        registerPhoneNetCallback();
+        registerEthernetWatch();
 
         if (UsbManager.ACTION_USB_DEVICE_ATTACHED.equals(getIntent().getAction())) usbInfo();
+        if (bannerSlot != null) bannerSlot.start();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (bannerSlot != null) bannerSlot.onHostResume();
     }
 
     @Override
@@ -253,16 +268,27 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onPause() {
+        if (bannerSlot != null) bannerSlot.onHostPause();
         super.onPause();
         saveSettings();
     }
 
     @Override
     protected void onDestroy() {
+        if (bannerSlot != null) {
+            bannerSlot.destroy();
+            bannerSlot = null;
+        }
         stopPoll();
         pingStop();
         unregisterReceiver(usbReceiver);
         cm.unregisterNetworkCallback(netCallback);
+        if (ethernetWatchOn) {
+            try {
+                cm.unregisterNetworkCallback(ethernetWatch);
+            } catch (RuntimeException ignored) {
+            }
+        }
         net.execute(this::closeStack);
         net.shutdown();
         pingExec.shutdownNow();
@@ -330,7 +356,53 @@ public class MainActivity extends Activity {
         }
     };
 
+    /**
+     * 폰 인터넷 표시는 프로세스 기본 네트워크를 본다.
+     * 광고가 이더넷을 피하려고 프로세스를 묶으면 그 콜백은 LTE/Wi-Fi 를 가리키므로,
+     * 이더넷 인터페이스가 남아 있는지는 {@link #ethernetWatch} 로 따로 본다.
+     */
+    private void registerPhoneNetCallback() {
+        cm.registerDefaultNetworkCallback(netCallback);
+    }
+
+    private void registerEthernetWatch() {
+        NetworkRequest req = new NetworkRequest.Builder()
+                .addTransportType(NetworkCapabilities.TRANSPORT_ETHERNET)
+                .build();
+        try {
+            cm.registerNetworkCallback(req, ethernetWatch, ui);
+            ethernetWatchOn = true;
+        } catch (RuntimeException e) {
+            android.util.Log.w("FieldNet", "ethernet watch failed", e);
+        }
+    }
+
+    private final ConnectivityManager.NetworkCallback ethernetWatch = new ConnectivityManager.NetworkCallback() {
+        @Override
+        public void onAvailable(Network network) {
+            osEthernet.put(network, "netChecking");
+            render();
+        }
+
+        @Override
+        public void onCapabilitiesChanged(Network network, NetworkCapabilities caps) {
+            String st = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) ? "netOk" : "netChecking";
+            osEthernet.put(network, st);
+            render();
+        }
+
+        @Override
+        public void onLost(Network network) {
+            osEthernet.remove(network);
+            render();
+        }
+    };
+
     String phoneNetLine() {
+        if (!osEthernet.isEmpty()) {
+            String st = osEthernet.values().iterator().next();
+            return t("phoneNet") + ": " + t("netEth") + " · " + t(st);
+        }
         if ("netNone".equals(netState) || netType.isEmpty()) {
             return t("phoneNet") + ": " + ("netNone".equals(netState) ? t("netNone") : t("netChecking"));
         }
@@ -787,6 +859,11 @@ public class MainActivity extends Activity {
             return;
         }
         final String key = Ip4.str(target) + ":" + port;
+        final boolean pauseAd = !isRead(req.fn);
+        if (pauseAd) {
+            writeInFlight++;
+            syncBanner();
+        }
         net.execute(() -> {
             String errKo = null, errEn = null;
             ModbusResult r = null;
@@ -836,6 +913,10 @@ public class MainActivity extends Activity {
             ModbusResult fr = r;
             String ek = errKo, ee = errEn;
             ui.post(() -> {
+                if (pauseAd) {
+                    writeInFlight = Math.max(0, writeInFlight - 1);
+                    syncBanner();
+                }
                 if (fr == null) {
                     err++;
                     lastErr = true;
@@ -958,6 +1039,7 @@ public class MainActivity extends Activity {
         int gen = ++pollGen;
         Req req = formReq();
         polling = true;
+        syncBanner();
         render();
         pollTick(gen, req);
     }
@@ -972,6 +1054,7 @@ public class MainActivity extends Activity {
     void stopPoll() {
         pollGen++;
         polling = false;
+        syncBanner();
     }
 
     void setInterval(int ms) {
@@ -1077,6 +1160,7 @@ public class MainActivity extends Activity {
         final int gen = ++pingGen;
         pingRes.clear();
         pingRunning = true;
+        syncBanner();
         pingVersion++;
         render();
         pingExec.execute(new Runnable() {
@@ -1133,6 +1217,7 @@ public class MainActivity extends Activity {
         pingGen++;
         if (!pingRunning) return;
         pingRunning = false;
+        syncBanner();
         int ok = 0;
         double sum = 0;
         for (PingRes r : pingRes) {
@@ -1156,6 +1241,7 @@ public class MainActivity extends Activity {
     void go(String to) {
         if (to.equals("ping") && !pingRunning && pingRes.isEmpty()) pingTarget = devIp;
         screen = to;
+        syncBanner();
         drawer = false;
         showScreen();
         renderDrawer();
@@ -1185,6 +1271,7 @@ public class MainActivity extends Activity {
         screenHost = new LinearLayout(this);
         screenHost.setOrientation(LinearLayout.VERTICAL);
         column.addView(screenHost, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        attachBanner(column);
         root.addView(column);
 
         mainScreen = new MainScreen(this);
@@ -1198,7 +1285,7 @@ public class MainActivity extends Activity {
         root.addView(toastView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         root.addView(drawerView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         root.addView(sheetView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        padBelowStatusBar(root);
+        watchInsets(root);
         setContentView(root);
         render();
         renderToast();
@@ -1206,13 +1293,43 @@ public class MainActivity extends Activity {
         renderSheet();
     }
 
-    /** targetSdk 35 는 화면이 상태바 아래로 깔리므로, 시계 영역 높이만큼 내용을 내린다. */
-    private static void padBelowStatusBar(View root) {
-        root.setOnApplyWindowInsetsListener((v, insets) -> {
+    /** 상태바 아래로 내용을 내리고, 배너는 내비게이션 바 위에 둔다. */
+    private void watchInsets(View rootView) {
+        rootView.setOnApplyWindowInsetsListener((v, insets) -> {
             int top = statusBarTop(insets);
+            navInset = navBarBottom(insets);
             if (v.getPaddingTop() != top) v.setPadding(0, top, 0, v.getPaddingBottom());
+            if (bannerSlot != null) bannerSlot.setBottomInset(navInset);
             return insets;
         });
+        rootView.requestApplyInsets();
+    }
+
+    private static int navBarBottom(WindowInsets insets) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            return insets.getInsets(WindowInsets.Type.navigationBars()).bottom;
+        }
+        return insets.getSystemWindowInsetBottom();
+    }
+
+    /** 언어 변경으로 뷰를 다시 만들어도 같은 배너 슬롯을 붙인다. */
+    private void attachBanner(LinearLayout column) {
+        if (bannerSlot == null) bannerSlot = new BannerSlot(this, cm);
+        View banner = bannerSlot.view();
+        if (banner.getParent() instanceof ViewGroup) ((ViewGroup) banner.getParent()).removeView(banner);
+        column.addView(banner, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        bannerSlot.setVisibilityListener(() -> {
+            if (toastKey != null) renderToast();
+        });
+        bannerSlot.setBottomInset(navInset);
+        syncBanner();
+    }
+
+    private void syncBanner() {
+        if (bannerSlot == null) return;
+        bannerSlot.setBusy(polling || pingRunning || writeInFlight > 0);
+        bannerSlot.setOnMainScreen("main".equals(screen));
     }
 
     private static int statusBarTop(WindowInsets insets) {
@@ -1316,7 +1433,12 @@ public class MainActivity extends Activity {
             }));
         }
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM);
-        lp.setMargins(N.dp(16), 0, N.dp(16), N.dp(40));
+        int lift = N.dp(40);
+        if (bannerSlot != null && bannerSlot.view().getVisibility() == View.VISIBLE) {
+            int h = bannerSlot.view().getHeight();
+            if (h > 0) lift = h + N.dp(12);
+        }
+        lp.setMargins(N.dp(16), 0, N.dp(16), lift);
         toastView.addView(box, lp);
     }
 

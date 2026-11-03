@@ -3,8 +3,12 @@
 
     <!-- USB 호스트(OTG) 필수 -->
     <uses-feature android:name="android.hardware.usb.host" android:required="true" />
-    <!-- 폰 인터넷 상태 표시용 (장비망과 분리 확인). 앱 자체는 인터넷 권한이 필요 없음 -->
+    <!-- 폰 인터넷 표시 + 광고를 LTE/Wi-Fi 로만 내보내기 위한 네트워크 확인 -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- 기본 네트워크가 USB 이더넷일 때 셀룰러/Wi-Fi 를 요청한다. 설치 시 부여되는 일반 권한. -->
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
+    <!-- 광고와 UMP 동의 전용. Modbus/USB 스택은 소켓을 쓰지 않는다. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <!-- 이더넷 어댑터가 하드웨어 키보드로 잡혀도 화면 키보드를 유지. adb 로만 부여된다. -->
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
 
@@ -12,6 +16,11 @@
         android:allowBackup="false"
         android:label="@string/app_name"
         android:theme="@style/AppTheme">
+
+        <!-- 값은 res/values/ads.xml. 지금은 Google 테스트 앱 ID. -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="@string/admob_application_id" />
 
         <activity
             android:name=".MainActivity"

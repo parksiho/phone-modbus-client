@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Google 공식 테스트 ID. 스토어 빌드 전에 두 값만 바꾸면 된다. README "광고" 참고.
+      앱 ID 는 매니페스트 APPLICATION_ID 가 이 문자열을 참조한다.
+      배너 단위는 적응형 배너 테스트 단위다.
+    -->
+    <string name="admob_application_id" translatable="false">ca-app-pub-3940256099942544~3347511713</string>
+    <string name="admob_banner_unit_id" translatable="false">ca-app-pub-3940256099942544/9214589741</string>
+</resources>
