@@ -90,7 +90,10 @@ Android Studio 에서 이 폴더를 열고 `app` 을 실행한다. (AGP 8.7, com
 
 ```bash
 ./gradlew assembleDebug
+./gradlew bundleRelease
 ```
+
+`bundleRelease` 는 R8 이 켜진 스토어용 AAB 입니다. 업로드 키가 없으면 서명하지 않고 끝납니다. 키 만드는 법과 Play 체크리스트는 `keystore.properties.example`, `tools/gen_upload_keystore.sh`, `play-store/release-checklist.md` 에 있습니다.
 
 ## 광고 (AdMob 배너)
 
@@ -130,7 +133,7 @@ API 31 미만을 포함해, 프로세스를 LTE/Wi-Fi 에 묶으면 기본 네�
 3. Play Console **정책 → 앱 콘텐츠 → 광고** 에서 광고 포함으로 선언한다.
 4. **데이터 보안** 양식에 광고 ID 등 AdMob 이 수집·공유하는 항목을 적고, 개인정보처리방침 URL 을 스토어 등록정보와 앱에 연결한다.
 5. Play Console 에 등록한 개발자 도메인 루트에 `app-ads.txt` 를 둔다. AdMob 앱 설정의 한 줄(`google.com, pub-xxxxxxxx, DIRECT, f08c47fec0942fa0`)을 넣는다.
-6. 테스트 ID 로 스토어 빌드를 올리지 않는다. 개발 중에는 테스트 ID 를 유지해 무효 트래픽으로 계정이 제한되지 않게 한다.
+6. 테스트 ID 로 스토어 빌드를 올리지 않는다. 개발 중에는 테스트 ID 를 유지해 무효 트래픽으로 계정이 제한되지 않게 한다. 등록정보, 데이터 보안, 개인정보처리방침, `app-ads.txt` 초안은 `play-store/` 에 있다.
 
 실기기에서 볼 것: Wi-Fi 또는 LTE 에서만 테스트 배너가 보이는지, 비행기 모드이거나 이더넷뿐이면 배너가 사라지는지, OS 가 어댑터를 잡은 상태에서도 Modbus/Ping 이 계속되는지, 폴링·쓰기·Ping 중에 배너 갱신이 멈추는지.
 

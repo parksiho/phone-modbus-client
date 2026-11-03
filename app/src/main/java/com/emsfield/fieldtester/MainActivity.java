@@ -262,7 +262,7 @@ public class MainActivity extends Activity {
         try {
             android.provider.Settings.Secure.putInt(getContentResolver(), "show_ime_with_hard_keyboard", 1);
         } catch (SecurityException ignored) {
-            // WRITE_SECURE_SETTINGS 는 adb 로 부여된 디버그 설치에서만 성공한다.
+            // 권한은 debug 매니페스트에만 있다. adb 로 부여된 디버그 설치에서만 성공한다.
         }
     }
 

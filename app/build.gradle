@@ -2,6 +2,44 @@ plugins {
     id 'com.android.application'
 }
 
+// 업로드 키. 저장소에 비밀을 넣지 않는다.
+// 환경변수가 있으면 그 값을 쓰고, 없으면 keystore.properties (gitignore) 를 읽는다.
+// 둘 다 없으면 서명하지 않은 release 번들을 만든다.
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('keystore.properties')
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+
+def signingValue = { String envName, String propertyName ->
+    def fromEnv = System.getenv(envName)
+    if (fromEnv != null && !fromEnv.trim().isEmpty()) {
+        return fromEnv.trim()
+    }
+    def fromFile = keystoreProperties.getProperty(propertyName)
+    if (fromFile != null && !fromFile.trim().isEmpty()) {
+        return fromFile.trim()
+    }
+    return null
+}
+
+def releaseStorePath = signingValue('KEYSTORE_FILE', 'storeFile')
+def releaseStorePassword = signingValue('KEYSTORE_PASSWORD', 'storePassword')
+def releaseKeyAlias = signingValue('KEY_ALIAS', 'keyAlias')
+def releaseKeyPassword = signingValue('KEY_PASSWORD', 'keyPassword')
+def releaseSignValues = [releaseStorePath, releaseStorePassword, releaseKeyAlias, releaseKeyPassword]
+def releaseStoreFile = null
+if (releaseSignValues.any { it != null }) {
+    if (releaseSignValues.any { it == null }) {
+        throw new GradleException('릴리스 서명 값이 일부만 있습니다. storeFile, storePassword, keyAlias, keyPassword 를 keystore.properties 또는 KEYSTORE_FILE, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD 로 모두 지정하세요.')
+    }
+    def candidate = new File(releaseStorePath)
+    releaseStoreFile = candidate.isAbsolute() ? candidate : rootProject.file(releaseStorePath)
+    if (!releaseStoreFile.isFile()) {
+        throw new GradleException("업로드 키스토어가 없습니다: ${releaseStoreFile}. tools/gen_upload_keystore.sh 와 keystore.properties.example 을 보세요.")
+    }
+}
+
 android {
     namespace 'com.emsfield.fieldtester'
     compileSdk 35
@@ -11,14 +49,30 @@ android {
         minSdk 26
         targetSdk 35
         versionCode 1
-        versionName '0.1.0-poc'
+        versionName '1.0.0'
         // play-services-ads 가 64K 메서드를 넘긴다. minSdk 21+ 는 런타임 multidex.
         multiDexEnabled true
     }
 
+    signingConfigs {
+        if (releaseStoreFile != null) {
+            release {
+                storeFile releaseStoreFile
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (releaseStoreFile != null) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 
